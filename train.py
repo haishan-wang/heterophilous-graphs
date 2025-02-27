@@ -4,7 +4,7 @@ from tqdm import tqdm
 import torch
 from torch.cuda.amp import autocast, GradScaler
 
-from model import Model
+from model import Model, MixModel
 from datasets import Dataset
 from utils import Logger, get_parameter_groups, get_lr_scheduler_with_warmup
 
@@ -65,7 +65,6 @@ def train_step(model, dataset, optimizer, scheduler, scaler, amp=False):
     with autocast(enabled=amp):
         logits = model(graph=dataset.graph, x=dataset.node_features)
         loss = dataset.loss_fn(input=logits[dataset.train_idx], target=dataset.labels[dataset.train_idx])
-
     scaler.scale(loss).backward()
     scaler.step(optimizer)
     scaler.update()
@@ -101,7 +100,7 @@ def main():
     logger = Logger(args, metric=dataset.metric, num_data_splits=dataset.num_data_splits)
 
     for run in range(1, args.num_runs + 1):
-        model = Model(model_name=args.model,
+        model = MixModel(model_name=args.model,
                       num_layers=args.num_layers,
                       input_dim=dataset.num_node_features,
                       hidden_dim=args.hidden_dim,
@@ -109,7 +108,8 @@ def main():
                       hidden_dim_multiplier=args.hidden_dim_multiplier,
                       num_heads=args.num_heads,
                       normalization=args.normalization,
-                      dropout=args.dropout)
+                      dropout=args.dropout,
+                      het_mode = None)
 
         model.to(args.device)
 

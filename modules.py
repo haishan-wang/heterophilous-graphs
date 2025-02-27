@@ -2,7 +2,7 @@ import torch
 from torch import nn
 from dgl import ops
 from dgl.nn.functional import edge_softmax
-
+import dgl.function as fn
 
 class ResidualModuleWrapper(nn.Module):
     def __init__(self, module, normalization, dim, **kwargs):
@@ -59,17 +59,43 @@ class GCNModule(nn.Module):
 
 
 class SAGEModule(nn.Module):
-    def __init__(self, dim, hidden_dim_multiplier, dropout, **kwargs):
+    def __init__(self, dim, hidden_dim_multiplier, dropout, het_mode = None, **kwargs):
         super().__init__()
         self.feed_forward_module = FeedForwardModule(dim=dim,
-                                                     input_dim_multiplier=2,
+                                                     input_dim_multiplier=4,
                                                      hidden_dim_multiplier=hidden_dim_multiplier,
                                                      dropout=dropout)
-
+        self.het_mode = het_mode
     def forward(self, graph, x):
-        message = ops.copy_u_mean(graph, x)
-        x = torch.cat([x, message], axis=1)
-
+        m1 = ops.copy_u(graph, x)
+        # if self.het_mode is None or self.het_mode == 'original':
+        #     message = ops.copy_e_mean(graph,  m1)
+        # else:
+        #     norm_x = torch.norm(x, dim =1).view(-1,1)
+        #     x1_d_x2 = ops.u_dot_v(graph, x, x)
+        #     norm_x1 = ops.copy_u(graph, norm_x)
+        #     norm_x2 = ops.copy_v(graph, norm_x)
+        #     hom = x1_d_x2 / torch.clamp(norm_x1 * norm_x2 ,min = 1e-10)
+        #     if self.het_mode == 'homophily':
+        #         message = ops.copy_e_mean(graph,  m1* (hom))
+        #     elif self.het_mode =='heterophily':
+        #         message = ops.copy_e_mean(graph,  m1* (1 - hom))
+        # x = torch.cat([x, message], axis=1)
+        
+        
+        
+        norm_x = torch.norm(x, dim =1).view(-1,1)
+        x1_d_x2 = ops.u_dot_v(graph, x, x)
+        norm_x1 = ops.copy_u(graph, norm_x)
+        norm_x2 = ops.copy_v(graph, norm_x)
+        hom = x1_d_x2 / torch.clamp(norm_x1 * norm_x2 ,min = 1e-10)
+        m0 = ops.copy_e_mean(graph,  m1)
+        m2 = ops.copy_e_mean(graph,  m1* hom)
+        m3 = ops.copy_e_mean(graph,  m1* (1-hom))
+        
+        
+        
+        x = torch.cat([x, m0, m2, m3], axis=1)
         x = self.feed_forward_module(graph, x)
 
         return x

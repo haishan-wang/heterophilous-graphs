@@ -1,7 +1,7 @@
 from torch import nn
 from modules import (ResidualModuleWrapper, FeedForwardModule, GCNModule, SAGEModule, GATModule, GATSepModule,
                      TransformerAttentionModule, TransformerAttentionSepModule)
-
+import torch
 
 MODULES = {
     'ResNet': [FeedForwardModule],
@@ -23,7 +23,7 @@ NORMALIZATION = {
 
 class Model(nn.Module):
     def __init__(self, model_name, num_layers, input_dim, hidden_dim, output_dim, hidden_dim_multiplier, num_heads,
-                 normalization, dropout):
+                 normalization, dropout, het_mode = None):
 
         super().__init__()
 
@@ -41,7 +41,8 @@ class Model(nn.Module):
                                                         dim=hidden_dim,
                                                         hidden_dim_multiplier=hidden_dim_multiplier,
                                                         num_heads=num_heads,
-                                                        dropout=dropout)
+                                                        dropout=dropout,
+                                                        het_mode = het_mode)
 
                 self.residual_modules.append(residual_module)
 
@@ -60,3 +61,34 @@ class Model(nn.Module):
         x = self.output_linear(x).squeeze(1)
 
         return x
+
+
+class MixModel(nn.Module):
+    def __init__(self, model_name, num_layers, input_dim, hidden_dim, output_dim, hidden_dim_multiplier, num_heads,
+                 normalization, dropout, het_mode = None):
+
+        super().__init__()
+        self.submodels = nn.ModuleList()
+        self.het_mode = het_mode
+        if het_mode == 'mix':
+            modes_list = ['heterophily', 'homophily', 'original']
+        else:
+            modes_list = [het_mode]
+        for mode in modes_list:
+            self.submodels.append(Model(model_name, num_layers, input_dim, hidden_dim, output_dim, hidden_dim_multiplier, num_heads,
+                 normalization, dropout, het_mode = mode))
+        self.lin = nn.Linear(in_features= len(modes_list)  *output_dim , out_features=output_dim )
+    def forward (self, graph, x):
+        if self.het_mode == 'mix':
+            outs = []
+            for model in self.submodels:
+                out = model(graph, x)
+                outs.append(out) 
+            
+            outs = torch.cat(outs, dim = 1)
+            out = self.lin(outs)
+        else:
+            model = self.submodels[0]
+            out = model(graph, x)
+        # breakpoint()
+        return out
