@@ -7,6 +7,8 @@ from torch.cuda.amp import autocast, GradScaler
 from model import Model, MixModel
 from datasets import Dataset
 from utils import Logger, get_parameter_groups, get_lr_scheduler_with_warmup
+import warnings
+warnings.simplefilter(action='ignore', category=FutureWarning)
 
 
 def get_args():
@@ -34,7 +36,7 @@ def get_args():
     parser.add_argument('--weight_decay', type=float, default=0)
 
     # training parameters
-    parser.add_argument('--lr', type=float, default=3e-5)
+    parser.add_argument('--lr', type=float, default=3e-4)
     parser.add_argument('--num_steps', type=int, default=1000)
     parser.add_argument('--num_warmup_steps', type=int, default=None,
                         help='If None, warmup_proportion is used instead.')
@@ -100,7 +102,7 @@ def main():
     logger = Logger(args, metric=dataset.metric, num_data_splits=dataset.num_data_splits)
 
     for run in range(1, args.num_runs + 1):
-        model = MixModel(model_name=args.model,
+        model = Model(model_name=args.model,
                       num_layers=args.num_layers,
                       input_dim=dataset.num_node_features,
                       hidden_dim=args.hidden_dim,
@@ -128,7 +130,7 @@ def main():
                 logger.update_metrics(metrics=metrics, step=step)
 
                 progress_bar.update()
-                progress_bar.set_postfix({metric: f'{value:.2f}' for metric, value in metrics.items()})
+                progress_bar.set_postfix({metric: f'{value:.4f}' for metric, value in metrics.items()})
 
         logger.finish_run()
         model.cpu()

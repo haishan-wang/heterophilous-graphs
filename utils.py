@@ -43,7 +43,9 @@ class Logger:
             print(f'run: {self.cur_run:02d}, step: {step:03d}, '
                   f'train {self.metric}: {metrics[f"train {self.metric}"]:.4f}, '
                   f'val {self.metric}: {metrics[f"val {self.metric}"]:.4f}, '
-                  f'test {self.metric}: {metrics[f"test {self.metric}"]:.4f}')
+                  f'test {self.metric}: {metrics[f"test {self.metric}"]:.4f}, '
+                  f'val_best: {self.val_metrics[-1]:.4f}, ' f'test_best: {self.test_metrics[-1]:.4f}'
+                  )
 
     def finish_run(self):
         self.save_metrics()
